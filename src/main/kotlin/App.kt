@@ -5,7 +5,7 @@ package org.zarkone.faillogs
 fun main(args: Array<String>) {
     println("hello world.")
     var conf = Config()
-    var githubRequest = GithubRequest(conf, "zarkone/literally.el")
+    var githubRequest = GithubRequest(conf, "zarkone/csv-to-fips-jsons")
 
-    println(githubRequest.getFailureRuns())
+    println(githubRequest.getLastFailedLog())
 }
