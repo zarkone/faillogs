@@ -1,40 +1,42 @@
 package org.zarkone.faillogs
 
-import com.github.kittinunf.fuel.Fuel
 import com.github.kittinunf.fuel.core.FuelManager
-import com.github.kittinunf.fuel.core.Headers
-import com.github.kittinunf.fuel.core.Parameters
-import com.github.kittinunf.fuel.core.Request
 import com.github.kittinunf.fuel.core.extensions.authentication
-import com.github.kittinunf.fuel.core.requests.DownloadRequest
 import com.github.kittinunf.fuel.httpDownload
 import com.github.kittinunf.fuel.httpGet
 import com.github.kittinunf.fuel.util.encodeBase64ToString
-
 import com.github.kittinunf.result.Result
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonConfiguration
-import sun.jvm.hotspot.memory.HeapBlock
-import java.io.File
-import javax.security.auth.login.Configuration
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.nio.charset.Charset
+import java.time.LocalDate
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
 
 
 @Serializable
 data class Runs(val total_count: Int, val workflow_runs: List<WorkflowRun>)
 
 @Serializable
-data class WorkflowRun(val logs_url: String, val conclusion: String)
+data class WorkflowRun(val logs_url: String, val conclusion: String, val jobs_url: String)
 
-class GithubResponse {
+@Serializable
+data class JobStep(val name: String, val status: String, val conclusion: String, val number: Int)
 
-}
+@Serializable
+data class Job(val steps: List<JobStep>, val name: String, val conclusion: String)
+
+@Serializable
+data class Jobs(val total_count: Int, val jobs: List<Job>)
 
 class GithubRequest(config: Config, repo: String) {
     var repo = repo
     var config = config
 
-    fun getFailedRuns(): List<WorkflowRun>? {
+    fun getLastFailedRun(): WorkflowRun? {
         var url = "https://api.github.com/repos/${repo}/actions/runs"
         val (request, response, result)  = url.httpGet().responseString()
 
@@ -48,39 +50,70 @@ class GithubRequest(config: Config, repo: String) {
 
                 val json = Json(jsonConf)
                 var o = json.parse(Runs.serializer(), runs)
-                return o.workflow_runs.filter { it.conclusion != "success" }
+                return o.workflow_runs.filter { it.conclusion == "failure" }.first()
             }
 
         }
         return null
     }
+    fun getFailedStepFilename(jobUrl: String): String? {
+        val (request, response, result) = jobUrl.httpGet().responseString()
+        when(result) {
+            is Result.Failure -> {
+                println(result.getException())
+            }
+            is Result.Success -> {
+                val steps = result.value
+                var jsonConf = JsonConfiguration(ignoreUnknownKeys = true, prettyPrint = true)
+                val json = Json(jsonConf)
+                var o = json.parse(Jobs.serializer(), steps)
+                val lastFailedJob = o.jobs.filter { it.conclusion == "failure" }.first()
+                val lastFailedStep = lastFailedJob.steps.filter{ it.conclusion == "failure"}.first()
 
-    fun getLastFailedLog(): String? {
-        var failed = getFailedRuns()
-        if (failed != null) {
-            val logsUrl = failed.first().logs_url
-            println(logsUrl)
+                return "%s/%d_%s.txt".format(lastFailedJob.name, lastFailedStep.number, lastFailedStep.name)
+
+            }
+        }
+
+        return null
+    }
+
+    data class LogFile(val name: String, val content: String)
+
+    fun getLastFailedLog(): LogFile? {
+        var failedRun = getLastFailedRun()
+        if (failedRun != null) {
             val numberOfBytes = 3276800
-            val zip = File.createTempFile(numberOfBytes.toString(), null)
+            val stream = ByteArrayOutputStream(numberOfBytes)
 
-            var manager = FuelManager.instance
-
-            val auth = "zarkone:${config.githubToken}"
-            val encodedAuth = auth.encodeBase64ToString()
-            val authHeader = "Basic $encodedAuth"
-
-            logsUrl.httpDownload()
-                .fileDestination{ _, _ -> zip }
+            val (request, response, wrapped) = failedRun.logs_url.httpDownload()
+                .streamDestination { _, _ -> Pair(stream, { ByteArrayInputStream(stream.toByteArray()) }) }
                 .authentication()
                 .basic("zarkone", config.githubToken)
                 .response()
 
+            val (data, error) = wrapped
+            if (data != null) {
+                val failedStepFilename = getFailedStepFilename(failedRun.jobs_url)
+                val zipStream = ZipInputStream(ByteArrayInputStream(data))
+                var ze: ZipEntry? = zipStream.nextEntry
 
-            println(zip)
+                while (ze != null) {
+                    if (ze.name == failedStepFilename) {
+                        val byteArray = ByteArray(102400)
+                        val size = zipStream.read(byteArray)
+
+                        if (size != -1) {
+                            return LogFile(name = ze.name, content = String(byteArray, 0, size))
+                        }
+                    }
+
+                    ze = zipStream.nextEntry
+                }
+            }
         }
         else {
             return null
-
         }
 
         return null

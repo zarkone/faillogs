@@ -7,5 +7,5 @@ fun main(args: Array<String>) {
     var conf = Config()
     var githubRequest = GithubRequest(conf, "zarkone/csv-to-fips-jsons")
 
-    println(githubRequest.getLastFailedLog())
+    println(githubRequest.getLastFailedLog()?.content)
 }
