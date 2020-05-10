@@ -1,11 +1,14 @@
 @file:JvmName("App")
 package org.zarkone.faillogs
 
-
 fun main(args: Array<String>) {
-    println("hello world.")
-    var conf = Config()
-    var githubRequest = GithubRequest(conf, "zarkone/csv-to-fips-jsons")
+    val repo = args[0]
+    val conf = Config()
+    val githubRequest = GithubRequest(conf, repo)
 
-    println(githubRequest.getLastFailedLog()?.content)
+    val name = githubRequest.getLastFailedLog()?.name
+    val content = githubRequest.getLastFailedLog()?.content
+
+    println("$name:")
+    println(content)
 }

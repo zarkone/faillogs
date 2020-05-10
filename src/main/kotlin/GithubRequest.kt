@@ -7,6 +7,7 @@ import com.github.kittinunf.fuel.httpGet
 import com.github.kittinunf.fuel.util.encodeBase64ToString
 import com.github.kittinunf.result.Result
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UnstableDefault
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonConfiguration
 import java.io.ByteArrayInputStream
@@ -32,41 +33,40 @@ data class Job(val steps: List<JobStep>, val name: String, val conclusion: Strin
 @Serializable
 data class Jobs(val total_count: Int, val jobs: List<Job>)
 
-class GithubRequest(config: Config, repo: String) {
-    var repo = repo
-    var config = config
+class GithubRequest(private val config: Config, private val repo: String) {
 
+    @OptIn(UnstableDefault::class)
     fun getLastFailedRun(): WorkflowRun? {
-        var url = "https://api.github.com/repos/${repo}/actions/runs"
-        val (request, response, result)  = url.httpGet().responseString()
+        val url = "https://api.github.com/repos/${repo}/actions/runs"
+        val (_, _, result)  = url.httpGet().responseString()
 
         when(result) {
             is Result.Failure -> {
                 println(result.getException())
             }
             is Result.Success -> {
-                var runs = result.value
-                var jsonConf = JsonConfiguration(ignoreUnknownKeys = true, prettyPrint = true)
+                val runs = result.value
+                val jsonConf = JsonConfiguration(ignoreUnknownKeys = true)
 
                 val json = Json(jsonConf)
-                var o = json.parse(Runs.serializer(), runs)
+                val o = json.parse(Runs.serializer(), runs)
                 return o.workflow_runs.filter { it.conclusion == "failure" }.first()
             }
 
         }
         return null
     }
+
+    @OptIn(UnstableDefault::class)
     fun getFailedStepFilename(jobUrl: String): String? {
-        val (request, response, result) = jobUrl.httpGet().responseString()
-        when(result) {
-            is Result.Failure -> {
-                println(result.getException())
-            }
+        val (_, _, result) = jobUrl.httpGet().responseString()
+        when (result) {
+            is Result.Failure -> println(result.getException())
             is Result.Success -> {
                 val steps = result.value
-                var jsonConf = JsonConfiguration(ignoreUnknownKeys = true, prettyPrint = true)
+                val jsonConf = JsonConfiguration(ignoreUnknownKeys = true, prettyPrint = true)
                 val json = Json(jsonConf)
-                var o = json.parse(Jobs.serializer(), steps)
+                val o = json.parse(Jobs.serializer(), steps)
                 val lastFailedJob = o.jobs.filter { it.conclusion == "failure" }.first()
                 val lastFailedStep = lastFailedJob.steps.filter{ it.conclusion == "failure"}.first()
 
@@ -81,18 +81,18 @@ class GithubRequest(config: Config, repo: String) {
     data class LogFile(val name: String, val content: String)
 
     fun getLastFailedLog(): LogFile? {
-        var failedRun = getLastFailedRun()
+        val failedRun = getLastFailedRun()
         if (failedRun != null) {
             val numberOfBytes = 3276800
             val stream = ByteArrayOutputStream(numberOfBytes)
 
-            val (request, response, wrapped) = failedRun.logs_url.httpDownload()
+            val (_, _, wrapped) = failedRun.logs_url.httpDownload()
                 .streamDestination { _, _ -> Pair(stream, { ByteArrayInputStream(stream.toByteArray()) }) }
                 .authentication()
                 .basic("zarkone", config.githubToken)
                 .response()
 
-            val (data, error) = wrapped
+            val (data, _) = wrapped
             if (data != null) {
                 val failedStepFilename = getFailedStepFilename(failedRun.jobs_url)
                 val zipStream = ZipInputStream(ByteArrayInputStream(data))
