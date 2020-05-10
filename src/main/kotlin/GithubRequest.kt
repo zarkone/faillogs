@@ -17,7 +17,6 @@ import java.time.LocalDate
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 
-
 @Serializable
 data class Runs(val total_count: Int, val workflow_runs: List<WorkflowRun>)
 
@@ -33,12 +32,17 @@ data class Job(val steps: List<JobStep>, val name: String, val conclusion: Strin
 @Serializable
 data class Jobs(val total_count: Int, val jobs: List<Job>)
 
+data class LogFile(val name: String, val content: String)
+
 class GithubRequest(private val config: Config, private val repo: String) {
 
     @OptIn(UnstableDefault::class)
     fun getLastFailedRun(): WorkflowRun? {
         val url = "https://api.github.com/repos/${repo}/actions/runs"
-        val (_, _, result)  = url.httpGet().responseString()
+        val (_, _, result)  = url.httpGet()
+            .authentication()
+            .basic(config.githubUser, config.githubToken)
+            .responseString()
 
         when(result) {
             is Result.Failure -> {
@@ -59,7 +63,11 @@ class GithubRequest(private val config: Config, private val repo: String) {
 
     @OptIn(UnstableDefault::class)
     fun getFailedStepFilename(jobUrl: String): String? {
-        val (_, _, result) = jobUrl.httpGet().responseString()
+        val (_, _, result) = jobUrl.httpGet()
+            .authentication()
+            .basic(config.githubUser, config.githubToken)
+            .responseString()
+
         when (result) {
             is Result.Failure -> println(result.getException())
             is Result.Success -> {
@@ -78,8 +86,6 @@ class GithubRequest(private val config: Config, private val repo: String) {
         return null
     }
 
-    data class LogFile(val name: String, val content: String)
-
     fun getLastFailedLog(): LogFile? {
         val failedRun = getLastFailedRun()
         if (failedRun != null) {
@@ -90,7 +96,7 @@ class GithubRequest(private val config: Config, private val repo: String) {
             val (_, _, wrapped) = failedRun.logs_url.httpDownload()
                 .streamDestination { _, _ -> Pair(stream, { ByteArrayInputStream(stream.toByteArray()) }) }
                 .authentication()
-                .basic("zarkone", config.githubToken)
+                .basic(config.githubUser, config.githubToken)
                 .response()
 
             val (data, _) = wrapped

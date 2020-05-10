@@ -1,5 +1,6 @@
 package org.zarkone.faillogs
 
 class Config {
-    var githubToken = System.getenv("GITHUB_TOKEN")
+    val githubToken = System.getenv("GITHUB_TOKEN")
+    val githubUser =  System.getenv("GITHUB_USER")
 }
