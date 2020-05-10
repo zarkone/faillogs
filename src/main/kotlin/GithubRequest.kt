@@ -83,6 +83,7 @@ class GithubRequest(private val config: Config, private val repo: String) {
     fun getLastFailedLog(): LogFile? {
         val failedRun = getLastFailedRun()
         if (failedRun != null) {
+            // TODO: make dynamic
             val numberOfBytes = 3276800
             val stream = ByteArrayOutputStream(numberOfBytes)
 
@@ -100,6 +101,7 @@ class GithubRequest(private val config: Config, private val repo: String) {
 
                 while (ze != null) {
                     if (ze.name == failedStepFilename) {
+                        // TODO: make dynamic
                         val byteArray = ByteArray(102400)
                         val size = zipStream.read(byteArray)
 
@@ -111,9 +113,6 @@ class GithubRequest(private val config: Config, private val repo: String) {
                     ze = zipStream.nextEntry
                 }
             }
-        }
-        else {
-            return null
         }
 
         return null
