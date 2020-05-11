@@ -2,24 +2,24 @@ package org.zarkone.faillogs
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonConfiguration
 import java.io.File
 import java.lang.IllegalArgumentException
 
 @Serializable
 class ConfigMap(var githubUser: String, var githubToken: String = "") {
     fun merge(o: ConfigMap): ConfigMap {
-        if (o.githubUser.isNotBlank()) {
-            githubUser = o.githubUser
-        }
-
-        if (o.githubToken.isNotBlank()) {
-            githubToken = o.githubToken
-        }
-        return this
+        return ConfigMap(
+                githubUser = 
+                if (o.githubUser.isNotBlank()) { o.githubUser } 
+                else { githubUser },
+        
+                githubToken =
+                if (o.githubToken.isNotBlank()) { o.githubToken }
+                else { githubToken }
+        )
     }
 
-    fun validate() {
+    fun validate(): Boolean {
         when {
             githubUser.isBlank() -> {
                 throw IllegalArgumentException("Github Username must be provided. Set ENV['GITHUB_USER'] or do `faillogs login`")
@@ -28,6 +28,8 @@ class ConfigMap(var githubUser: String, var githubToken: String = "") {
                 throw IllegalArgumentException("Github Token must be provided. Set ENV['GITHUB_TOKEN'] or do `faillogs login`")
             }
         }
+
+        return true
     }
 }
 
