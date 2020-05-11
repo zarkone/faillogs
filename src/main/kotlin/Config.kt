@@ -2,8 +2,19 @@ package org.zarkone.faillogs
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonConfiguration
 import java.io.File
 import java.lang.IllegalArgumentException
+
+
+private val configFile = File(System.getProperty("user.home") + "/.config/faillogs/config.json")
+
+fun writeConfigFile(configToFile: ConfigMap) {
+    configToFile.validateUsername()
+    val configString = Json(JsonConfiguration(encodeDefaults = false)).stringify(ConfigMap.serializer(), configToFile)
+
+    configFile.writeText(configString)
+}
 
 @Serializable
 class ConfigMap(var githubUser: String, var githubToken: String = "") {
@@ -19,22 +30,33 @@ class ConfigMap(var githubUser: String, var githubToken: String = "") {
         )
     }
 
-    fun validate(): Boolean {
+    fun validateUsername() {
         when {
             githubUser.isBlank() -> {
-                throw IllegalArgumentException("Github Username must be provided. Set ENV['GITHUB_USER'] or do `faillogs login`")
-            }
-            githubToken.isBlank() -> {
-                throw IllegalArgumentException("Github Token must be provided. Set ENV['GITHUB_TOKEN'] or do `faillogs login`")
+                throw IllegalArgumentException("Github Username must be provided.")
             }
         }
-
-        return true
     }
+
+    fun validateToken() {
+        when {
+            githubToken.isBlank() -> {
+                throw IllegalArgumentException("Github Token must be provided.")
+            }
+        }
+    }
+
+    fun validate() {
+        validateUsername()
+        validateToken()
+    }
+
 }
 
 class Config {
     private var configMap: ConfigMap
+
+
     val githubToken: String
         get() = configMap.githubToken
     val githubUser: String
@@ -53,8 +75,6 @@ class Config {
     }
 
     private fun fromConfigFile(): ConfigMap {
-        val configFile = File(System.getProperty("user.home") + "/.config/faillogs/config.json")
-
         if (!configFile.exists()) {
             return ConfigMap(githubUser = "")
         }
