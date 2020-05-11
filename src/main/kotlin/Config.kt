@@ -7,31 +7,40 @@ import java.io.File
 import java.lang.IllegalArgumentException
 
 @Serializable
-data class ConfigMap(var githubUser: String, var githubToken: String = "")
+class ConfigMap(var githubUser: String, var githubToken: String = "") {
+    fun merge(o: ConfigMap): ConfigMap {
+        if (o.githubUser.isNotBlank()) {
+            githubUser = o.githubUser
+        }
 
-class Config {
-    var githubToken: String
-    var githubUser: String
+        if (o.githubToken.isNotBlank()) {
+            githubToken = o.githubToken
+        }
+        return this
+    }
 
-    init {
-        val fromFile = fromConfigFile()
-        val fromEnv = fromEnv()
-
+    fun validate() {
         when {
-            !fromEnv.githubUser.isBlank() -> { githubUser = fromEnv.githubUser }
-            fromFile.githubUser.isBlank() -> {
+            githubUser.isBlank() -> {
                 throw IllegalArgumentException("Github Username must be provided. Set ENV['GITHUB_USER'] or do `faillogs login`")
             }
-            else -> { githubUser = fromFile.githubUser }
-        }
-
-        when {
-            !fromEnv.githubToken.isBlank() -> { githubToken = fromEnv.githubToken }
-            fromFile.githubToken.isBlank() -> {
+            githubToken.isBlank() -> {
                 throw IllegalArgumentException("Github Token must be provided. Set ENV['GITHUB_TOKEN'] or do `faillogs login`")
             }
-            else -> { githubToken = fromFile.githubToken }
         }
+    }
+}
+
+class Config {
+    private var configMap: ConfigMap
+    val githubToken: String
+        get() = configMap.githubToken
+    val githubUser: String
+        get() = configMap.githubUser
+
+    init {
+        configMap = fromConfigFile().merge(fromEnv())
+        configMap.validate()
     }
 
     private fun fromEnv(): ConfigMap {
@@ -48,9 +57,9 @@ class Config {
             return ConfigMap(githubUser = "")
         }
 
-        val configText = configFile.readText()
-
-        return Json(JsonConfiguration()).parse(ConfigMap.serializer(), configText)
-
+        return Json.parse(
+                ConfigMap.serializer(),
+                string = configFile.readText()
+        )
     }
 }
