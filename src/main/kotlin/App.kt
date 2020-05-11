@@ -6,10 +6,19 @@ fun printHelp() {
     System.err.println("faillogs username/repo")
 }
 fun main(args: Array<String>) {
-    if (args.isEmpty() || args[0] == "--help") {
-        printHelp()
-        return
+
+    when {
+        (args.isEmpty() || args[0] == "--help") -> {
+            printHelp()
+            return
+        }
+
+        args[0] == "login" -> {
+            // TODO: implement login
+            throw UnsupportedOperationException("login: not implemented yet")
+        }
     }
+
 
     val cmd = args[0]
 
