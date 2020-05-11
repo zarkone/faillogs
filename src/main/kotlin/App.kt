@@ -1,9 +1,21 @@
 @file:JvmName("App")
 package org.zarkone.faillogs
 
+import kotlinx.serialization.json.Json
+
 fun printHelp() {
     System.err.println("Usage:")
     System.err.println("faillogs username/repo")
+}
+
+fun login() {
+    print("Github Username: ")
+    val githubUsername = readLine() ?: ""
+    val githubToken = String(System.console()?.readPassword("Github Token: ") ?: CharArray(0))
+    val configMap = ConfigMap(githubUsername,githubToken)
+
+    writeConfigFile(configMap)
+
 }
 fun main(args: Array<String>) {
 
@@ -14,8 +26,8 @@ fun main(args: Array<String>) {
         }
 
         args[0] == "login" -> {
-            // TODO: implement login
-            throw UnsupportedOperationException("login: not implemented yet")
+            login()
+            return
         }
     }
 
